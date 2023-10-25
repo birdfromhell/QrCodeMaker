@@ -1,7 +1,7 @@
 import os
+import segno
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, validator
-import pyqrcode
+from pydantic import BaseModel
 import aiohttp
 import aiofiles
 
@@ -9,21 +9,15 @@ app = FastAPI()
 
 
 class Item(BaseModel):
-    url: str
-
-    @validator("url")
-    def validate_url(cls, v):
-        if not v.startswith("http://") and not v.startswith("https://"):
-            raise ValueError("Invalid URL provided")
-        return v
+    data: str
 
 
 @app.post("/generate_qrcode/")
 async def generate_qrcode(item: Item):
     try:
-        url = pyqrcode.create(item.url)
+        qr = segno.make(item.data)
         filename = "qrcode.png"
-        url.png(filename, scale=8)
+        qr.save(filename, scale=10, border=0)
 
         async with aiohttp.ClientSession() as session:
             async with aiofiles.open(filename, mode='rb') as f:
@@ -33,6 +27,7 @@ async def generate_qrcode(item: Item):
                     'name': 'qrcode',
                     'image': binary_data
                 }
+
                 response = await session.post('https://api.imgbb.com/1/upload?key=c793634661b542c39568732fe21627ff',
                                               data=data)
                 json_result = await response.json()
